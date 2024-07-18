@@ -46,7 +46,7 @@ impl Simulation {
             masses: vec![],
             fixed: vec![],
             sticks: vec![],
-            force: Vec2::new(1.0, 200.0),
+            force: Vec2::new(0.0, 200.0),
         }
     }
 
