@@ -20,7 +20,7 @@ async fn main() {
         Point::new(Vec2::new(screen_width() / 2.0, screen_height() / 2.0 - 30.0)),
         Point::new(Vec2::new(screen_width() / 2.0, screen_height() / 2.0 - 50.0)),
 
-        Point::new(Vec2::new(screen_width()-1.0, screen_height() / 2.0)).fixed(),
+        Point::new(Vec2::new(screen_width() / 2.0 + 500.0, screen_height() / 2.0)).fixed(),
         ]);
         simulation.add_link(Link::new(0, 1).min_length(100.0).max_length(100.0));//
     simulation.add_link(Link::new(1, 2).min_length(100.0).max_length(100.0));
@@ -38,6 +38,10 @@ async fn main() {
 
     loop {
         clear_background(BLACK);
+        let font_size: u16 = 40;
+        let text = "Press Space to pause the simulation";
+        let dims = measure_text(text, None, font_size, 1.0);
+        draw_text(text, screen_width()/2.0 - dims.width/2.0, dims.height, font_size as f32, GRAY);
 
         if is_key_pressed(KeyCode::Space) {
             sim_paused = !sim_paused;
