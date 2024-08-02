@@ -1,5 +1,6 @@
 use macroquad::{prelude::*, ui::{self, hash}};
 use miniquad::window::screen_size;
+use rayon::prelude::*;
 
 use super::{ui::colorbox, Link};
 
@@ -65,6 +66,8 @@ pub struct Simulation {
     ui_text_stiffness: String,
 }
 impl Simulation {
+    const UPDATE_STEPS: usize = 8;
+
     pub fn new() -> Self {
         let (color_picker_texture, _) = super::ui::color_picker_texture(100, 100);
         Self {
@@ -135,7 +138,7 @@ impl Simulation {
         if let Some(target) = &self.selection {
             if target.0 == SelectTarget::Point {
                 ui::widgets::Window::new(hash!(), vec2(10.0, 10.0), vec2(200.0, 200.0))
-                    .label("Point editor")
+                    .label(&format!("Editing Point {}", target.1))
                     .movable(false)
                     .ui(&mut *ui::root_ui(), |ui| {
                         colorbox(
@@ -181,41 +184,84 @@ impl Simulation {
 
 
     pub fn update(&mut self, delta: f32) {
+        for _ in 0..Simulation::UPDATE_STEPS {
+            self.internal_update(delta)
+        }
+    }
+
+
+    fn internal_update(&mut self, delta: f32) {
         if delta > 1.0 {
             return;
         }
+
+        // Somehow macroquad doesnt want to be called inside of a rayon iterator, so call it outside
+        let screen_size = screen_size();
         
-        for i in 0..self.positions.len() {
-            if self.fixed[i] {
-                continue
+        self.positions.par_iter_mut().zip(self.prev_positions.par_iter_mut()).enumerate().for_each(|(index, (position, prev_position))| {
+            if self.fixed[index] {
+                return;
             };
 
-            let velocity = self.positions[i] - self.prev_positions[i];
-            let mut new_prev_pos = self.positions[i];
+            let velocity = *position - *prev_position;
+            let mut new_prev_pos = *position;
             // Dont scale gravity by mass
             let accel = self.force;
-            let mut new_pos = self.positions[i] + velocity + accel * delta * delta;
+            let mut new_pos = *position + velocity + accel * delta * delta;
             
             // Apply boundary constraints
             let velocity = new_pos - new_prev_pos;
             if new_pos.x < 0.0 {
                 new_pos.x = 0.0;
                 new_prev_pos.x = new_pos.x + velocity.x;
-            } else if new_pos.x > screen_width() {
-                new_pos.x = screen_width();
+            } else if new_pos.x > screen_size.0 {
+                new_pos.x = screen_size.0;
                 new_prev_pos.x = new_pos.x + velocity.x;
             }
             if new_pos.y < 0.0 {
                 new_pos.y = 0.0;
                 new_prev_pos.y = new_pos.y + velocity.y;
-            } else if new_pos.y > screen_height() {
-                new_pos.y = screen_height();
+            } else if new_pos.y > screen_size.1 {
+                new_pos.y = screen_size.1;
                 new_prev_pos.y = new_pos.y + velocity.y;
             }
 
-            self.positions[i] = new_pos;
-            self.prev_positions[i] = new_prev_pos;
-        }
+            *position = new_pos;
+            *prev_position = new_prev_pos;
+        });
+
+
+        // for i in 0..self.positions.len() {
+        //     if self.fixed[i] {
+        //         continue
+        //     };
+
+        //     let velocity = self.positions[i] - self.prev_positions[i];
+        //     let mut new_prev_pos = self.positions[i];
+        //     // Dont scale gravity by mass
+        //     let accel = self.force;
+        //     let mut new_pos = self.positions[i] + velocity + accel * delta * delta;
+            
+        //     // Apply boundary constraints
+        //     let velocity = new_pos - new_prev_pos;
+        //     if new_pos.x < 0.0 {
+        //         new_pos.x = 0.0;
+        //         new_prev_pos.x = new_pos.x + velocity.x;
+        //     } else if new_pos.x > screen_width() {
+        //         new_pos.x = screen_width();
+        //         new_prev_pos.x = new_pos.x + velocity.x;
+        //     }
+        //     if new_pos.y < 0.0 {
+        //         new_pos.y = 0.0;
+        //         new_prev_pos.y = new_pos.y + velocity.y;
+        //     } else if new_pos.y > screen_height() {
+        //         new_pos.y = screen_height();
+        //         new_prev_pos.y = new_pos.y + velocity.y;
+        //     }
+
+        //     self.positions[i] = new_pos;
+        //     self.prev_positions[i] = new_prev_pos;
+        // }
 
         self.constrain(delta);
     }
@@ -230,7 +276,7 @@ impl Simulation {
             let p1 = self.positions[link.to_idx];
             let p1_mass = self.masses[link.to_idx];
             let pos_delta = p1 - p0;
-            let dist = pos_delta.length();
+            let dist = pos_delta.length().max(f32::EPSILON);
 
             if dist > link.min_length && dist < link.max_length {
                 continue;
