@@ -1,5 +1,5 @@
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Link {
     pub(crate) from_idx: usize,
     pub(crate) to_idx: usize,

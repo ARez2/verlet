@@ -24,6 +24,8 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    std::env::set_var("RUST_BACKTRACE", "1");
+
     //rayon::ThreadPoolBuilder::new().num_threads(1).build_global().unwrap();
 
     let mut simulation = Simulation::new();
@@ -50,15 +52,12 @@ async fn main() {
         }
     }
 
-
-    let mut sim_paused = false;
-
     let mut time_sum = Duration::ZERO;
     let mut num_iterations = 0;
 
     loop {
         clear_background(BLACK);
-        if !sim_paused {
+        if num_iterations > 0 {
             num_iterations += 1;
             
             let font_size: u16 = 40;
@@ -67,17 +66,9 @@ async fn main() {
             draw_text(&text, screen_width()/2.0 - dims.width/2.0, dims.height, font_size as f32, GRAY);
         }
 
-        if is_key_pressed(KeyCode::Space) {
-            sim_paused = !sim_paused;
-        }
-
-        simulation.handle_selection();
-        if !sim_paused {
-            let start = Instant::now();
-            simulation.update(1.0 / 60.0);
-            time_sum += start.elapsed();
-        }
-        simulation.draw();
+        let start = Instant::now();
+        simulation.update(1.0 / 60.0);
+        time_sum += start.elapsed();
 
         next_frame().await
     }
