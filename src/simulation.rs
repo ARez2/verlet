@@ -1,7 +1,7 @@
 use macroquad::{prelude::*, ui::{self, hash}};
 use miniquad::window::screen_size;
 
-use super::ui::colorbox;
+use super::{ui::colorbox, Link};
 
 
 const POINT_RADIUS: f32 = 7.0;
@@ -9,49 +9,6 @@ const SELECT_COLOR: Color = BLUE;
 // Helps with selection, by extending "collision shape"
 const SELECT_GRACE: f32 = 5.0;
 
-
-#[derive(Debug)]
-pub struct Link {
-    from_idx: usize,
-    to_idx: usize,
-    min_length: f32,
-    max_length: f32,
-    stiffness: f32,
-    damping: f32,
-}
-impl Link {
-    pub fn new(from_idx: usize, to_idx: usize) -> Self {
-        Self {
-            from_idx,
-            to_idx,
-            min_length: 0.0,
-            max_length: f32::MAX,
-            stiffness: 1.0,
-            damping: 1.0,
-        }
-    }
-
-    pub fn min_length(mut self, val: f32) -> Self {
-        self.min_length = val;
-        self
-    }
-    pub fn max_length(mut self, val: f32) -> Self {
-        self.max_length = val;
-        self
-    }
-    /// Sets the stiffness of the Link
-    /// If the damping is `0.0`, the stiffness wont have any effect
-    pub fn stiffness(mut self, val: f32) -> Self {
-        self.stiffness = val;
-        self
-    }
-    /// Sets the damping of the link.
-    /// A damping of `0.0` will make the link completely stiff, a damping of `1.0` will make it completely elastic
-    pub fn damping(mut self, val: f32) -> Self {
-        self.damping = val;
-        self
-    }
-}
 
 // Only used for defining points, not in the Simulation itself
 #[derive(Debug)]

@@ -50,7 +50,7 @@ async fn main() {
 
         simulation.handle_selection();
         if !sim_paused {
-            simulation.perform_update();
+            simulation.update(1.0 / 60.0);
         }
         simulation.draw();
 
