@@ -1,1 +1,5 @@
 /target
+
+# Exclude flamegraph data
+**/perf.data**
+**/flamegraph.svg
