@@ -1,11 +1,12 @@
 use macroquad::prelude::*;
 
 mod simulation;
-use simulation::{Point, Simulation, Link};
+mod link;
+pub use link::Link;
+use simulation::{Point, Simulation};
 
 pub mod ui;
 
-const UPDATE_STEPS: usize= 8;
 
 #[macroquad::main("Verlet")]
 async fn main() {
@@ -49,10 +50,7 @@ async fn main() {
 
         simulation.handle_selection();
         if !sim_paused {
-            let delta = 1.0/60.0;
-            for _ in 0..UPDATE_STEPS {
-                simulation.update(delta / UPDATE_STEPS as f32);
-            }
+            simulation.perform_update();
         }
         simulation.draw();
 
