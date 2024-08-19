@@ -86,7 +86,7 @@ pub struct Simulation {
     previous_state: SimulationState,
     // And write to next_state
     next_state: SimulationState,
-    paused: bool,
+    pub paused: bool,
 
     color_picker_texture: Texture2D,
     ui_text_stiffness: String,
