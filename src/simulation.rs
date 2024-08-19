@@ -142,20 +142,20 @@ impl Simulation {
         if is_mouse_button_pressed(MouseButton::Left) && !ui::root_ui().is_mouse_over(mouse_pos) { // Find a point to select
             self.next_state.selection = None;
             let mut selection_distance = f32::MAX;
-            for i in 0..self.previous_state.positions.len() {
-                let pos = self.previous_state.positions[i];
+            for i in 0..self.next_state.positions.len() {
+                let pos = self.next_state.positions[i];
                 let dist = mouse_pos.distance(pos);
                 if dist < POINT_RADIUS {
                     self.next_state.selection = Some((SelectTarget::Point, i));
                     selection_distance = dist - POINT_RADIUS;
                 }
             }
-            for i in 0..self.previous_state.links.len() {
-                let link = &self.previous_state.links[i];
-                let dist = distance_from_line(mouse_pos, self.previous_state.positions[link.from_idx], self.previous_state.positions[link.to_idx]);
+            for i in 0..self.next_state.links.len() {
+                let link = &self.next_state.links[i];
+                let dist = distance_from_line(mouse_pos, self.next_state.positions[link.from_idx], self.next_state.positions[link.to_idx]);
                 if dist + POINT_RADIUS < POINT_RADIUS*SELECT_GRACE && dist < selection_distance {
                     self.next_state.selection = Some((SelectTarget::Link, i));
-                    self.ui_text_stiffness = self.previous_state.links[i].stiffness.to_string();
+                    self.ui_text_stiffness = self.next_state.links[i].stiffness.to_string();
                     selection_distance = dist;
                 }
             }
@@ -197,7 +197,7 @@ impl Simulation {
                         ui.slider(hash!(), "Max length", 0f32..1000f32, &mut self.next_state.links[target.1].max_length);
                         ui.input_text(hash!(), "Stiffness", &mut self.ui_text_stiffness);
                         ui.slider(hash!(), "Damping", 0f32..1f32, &mut self.next_state.links[target.1].damping);
-                        self.next_state.links[target.1].min_length = self.previous_state.links[target.1].min_length.min(self.previous_state.links[target.1].max_length);
+                        self.next_state.links[target.1].min_length = self.next_state.links[target.1].min_length.min(self.next_state.links[target.1].max_length);
 
                         // Clean up input string a bit and parse it back to a float
                         self.ui_text_stiffness = self.ui_text_stiffness.trim_end().to_string();
