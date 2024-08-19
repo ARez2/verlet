@@ -37,7 +37,7 @@ async fn main() {
         for x in 0..width {
             let from_idx = y * width + x;
             let mut pt = Point::new(spacing + Vec2::new(x as f32, y as f32) * spacing);
-            let stiff = 0.01;
+            let stiff = 0.3;
             let damp = 1.0;
             if y == 0 {
                 pt = pt.fixed();

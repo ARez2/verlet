@@ -21,6 +21,7 @@ struct SimulationState {
     links: Vec<Link>,
 
     force: Vec2,
+    wall_damping: f32,
     selection: Option<(SelectTarget, usize)>,
     dragging: bool,
 }
@@ -34,6 +35,7 @@ impl SimulationState {
             fixed: vec![],
             links: vec![],
             force: Vec2::new(0.0, 200.0),
+            wall_damping: 0.9,
             selection: None,
             dragging: false,
         }
@@ -256,19 +258,13 @@ impl Simulation {
             
             // Apply boundary constraints
             let velocity = new_pos - new_prev_pos;
-            if new_pos.x < 0.0 {
-                new_pos.x = 0.0;
-                new_prev_pos.x = new_pos.x + velocity.x;
-            } else if new_pos.x > screen_size.0 {
-                new_pos.x = screen_size.0;
-                new_prev_pos.x = new_pos.x + velocity.x;
+            if new_pos.x < 0.0 || new_pos.x > screen_size.0 {
+                new_pos.x = new_pos.x.clamp(0.0, screen_size.0);
+                new_prev_pos.x = new_pos.x + velocity.x * previous_state.wall_damping;
             }
-            if new_pos.y < 0.0 {
-                new_pos.y = 0.0;
-                new_prev_pos.y = new_pos.y + velocity.y;
-            } else if new_pos.y > screen_size.1 {
-                new_pos.y = screen_size.1;
-                new_prev_pos.y = new_pos.y + velocity.y;
+            if new_pos.y < 0.0 || new_pos.y > screen_size.1 {
+                new_pos.y = new_pos.y.clamp(0.0, screen_size.1);
+                new_prev_pos.y = new_pos.y + velocity.y * previous_state.wall_damping;
             }
 
             next_state.positions[i] = new_pos;
