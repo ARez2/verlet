@@ -7,5 +7,5 @@ edition = "2021"
 macroquad = "0.4.11"
 rayon = "1.10.0"
 
-# [profile.release]
-# debug = true
+[profile.release]
+debug = true
