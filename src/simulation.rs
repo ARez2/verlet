@@ -172,7 +172,7 @@ impl Simulation {
                             ui,
                             hash!(),
                             "Start color",
-                            &mut self.previous_state.colors[target.1],
+                            &mut self.next_state.colors[target.1],
                             self.color_picker_texture.clone(),
                         );
                 });
@@ -193,10 +193,10 @@ impl Simulation {
                     .label("Link editor")
                     .movable(false)
                     .ui(&mut *ui::root_ui(), |ui| {
-                        ui.slider(hash!(), "Min length", 0f32..1000f32, &mut self.previous_state.links[target.1].min_length);
-                        ui.slider(hash!(), "Max length", 0f32..1000f32, &mut self.previous_state.links[target.1].max_length);
+                        ui.slider(hash!(), "Min length", 0f32..1000f32, &mut self.next_state.links[target.1].min_length);
+                        ui.slider(hash!(), "Max length", 0f32..1000f32, &mut self.next_state.links[target.1].max_length);
                         ui.input_text(hash!(), "Stiffness", &mut self.ui_text_stiffness);
-                        ui.slider(hash!(), "Damping", 0f32..1f32, &mut self.previous_state.links[target.1].damping);
+                        ui.slider(hash!(), "Damping", 0f32..1f32, &mut self.next_state.links[target.1].damping);
                         self.next_state.links[target.1].min_length = self.previous_state.links[target.1].min_length.min(self.previous_state.links[target.1].max_length);
 
                         // Clean up input string a bit and parse it back to a float
@@ -214,7 +214,6 @@ impl Simulation {
         if is_key_pressed(KeyCode::Space) {
             self.paused = !self.paused;
         }
-        self.handle_selection();
 
         rayon::scope(|s| {
             if !self.paused {
@@ -224,8 +223,9 @@ impl Simulation {
                     }
                 });
             }
-            Simulation::draw(&self.previous_state);
         });
+        self.handle_selection();
+        Simulation::draw(&self.next_state);
         std::mem::swap(&mut self.next_state, &mut self.previous_state);
     }
 
@@ -237,49 +237,37 @@ impl Simulation {
 
         // Somehow macroquad doesnt want to be called inside of a rayon iterator, so call it outside
         let screen_size = screen_size();
-        let num_threads = rayon::current_num_threads();
+        for i in 0..previous_state.positions.len() {
+            if previous_state.fixed[i] {
+                continue
+            };
 
-        previous_state.positions
-        .par_chunks(num_threads)
-        .zip(previous_state.prev_positions.par_chunks(num_threads))
-        .zip(next_state.positions.par_chunks_mut(num_threads))
-        .zip(next_state.prev_positions.par_chunks_mut(num_threads))
-        .enumerate()
-        .for_each(|(index, (((chunk_positions, chunk_prev_positions), next_positions), next_prev_positions))| {
-            // Iterate over the chunk
-            for i in 0..chunk_positions.len() {
-                if previous_state.fixed[index + i] {
-                    return;
-                };
-                
-                let position = chunk_positions[i];
-                let velocity = position - chunk_prev_positions[i];
-                let mut new_prev_pos = position;
-                // Dont scale gravity by mass
-                let accel = previous_state.force;
-                let mut new_pos = position + velocity + accel * delta * delta;
-                
-                // Apply boundary constraints
-                let velocity = new_pos - new_prev_pos;
-                if new_pos.x < 0.0 {
-                    new_pos.x = 0.0;
-                    new_prev_pos.x = new_pos.x + velocity.x;
-                } else if new_pos.x > screen_size.0 {
-                    new_pos.x = screen_size.0;
-                    new_prev_pos.x = new_pos.x + velocity.x;
-                }
-                if new_pos.y < 0.0 {
-                    new_pos.y = 0.0;
-                    new_prev_pos.y = new_pos.y + velocity.y;
-                } else if new_pos.y > screen_size.1 {
-                    new_pos.y = screen_size.1;
-                    new_prev_pos.y = new_pos.y + velocity.y;
-                }
-    
-                next_positions[i] = new_pos;
-                next_prev_positions[i] = new_prev_pos;
+            let velocity = previous_state.positions[i] - previous_state.prev_positions[i];
+            let mut new_prev_pos = previous_state.positions[i];
+            // Dont scale gravity by mass
+            let accel = previous_state.force;
+            let mut new_pos = previous_state.positions[i] + velocity + accel * delta * delta;
+            
+            // Apply boundary constraints
+            let velocity = new_pos - new_prev_pos;
+            if new_pos.x < 0.0 {
+                new_pos.x = 0.0;
+                new_prev_pos.x = new_pos.x + velocity.x;
+            } else if new_pos.x > screen_size.0 {
+                new_pos.x = screen_size.0;
+                new_prev_pos.x = new_pos.x + velocity.x;
             }
-        });
+            if new_pos.y < 0.0 {
+                new_pos.y = 0.0;
+                new_prev_pos.y = new_pos.y + velocity.y;
+            } else if new_pos.y > screen_size.1 {
+                new_pos.y = screen_size.1;
+                new_prev_pos.y = new_pos.y + velocity.y;
+            }
+
+            next_state.positions[i] = new_pos;
+            next_state.prev_positions[i] = new_prev_pos;
+        }
 
         Simulation::constrain(next_state, previous_state, delta);
     }

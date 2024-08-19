@@ -26,7 +26,7 @@ fn window_conf() -> Conf {
 async fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
 
-    //rayon::ThreadPoolBuilder::new().num_threads(1).build_global().unwrap();
+    //rayon::ThreadPoolBuilder::new().num_threads(2).build_global().unwrap();
 
     let mut simulation = Simulation::new();
     let width = 100;
