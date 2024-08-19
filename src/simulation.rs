@@ -11,7 +11,7 @@ const SELECT_COLOR: Color = BLUE;
 const SELECT_GRACE: f32 = 5.0;
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct SimulationState {
     positions: Vec<Vec2>,
     prev_positions: Vec<Vec2>,
@@ -213,6 +213,10 @@ impl Simulation {
     pub fn update(&mut self, delta: f32) {
         if is_key_pressed(KeyCode::Space) {
             self.paused = !self.paused;
+            // Copy over the modified next_state
+            if !self.paused {
+                let _ = std::mem::replace(&mut self.previous_state, self.next_state.clone());
+            }
         }
 
         rayon::scope(|s| {
@@ -224,9 +228,11 @@ impl Simulation {
                 });
             }
         });
-        self.handle_selection();
         Simulation::draw(&self.next_state);
-        std::mem::swap(&mut self.next_state, &mut self.previous_state);
+        self.handle_selection();
+        if !self.paused {
+            std::mem::swap(&mut self.next_state, &mut self.previous_state);
+        }
     }
 
 
