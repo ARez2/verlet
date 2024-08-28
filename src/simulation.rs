@@ -324,7 +324,6 @@ impl Simulation {
 
     /// Draws all points and links, coloring the selection differently
     fn draw(state: &SimulationState) {
-        debug!("draw");
         for i in 0..state.links.len() {
             let from = state.positions[state.links[i].from_idx];
             let to = state.positions[state.links[i].to_idx];
