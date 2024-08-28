@@ -95,6 +95,7 @@ pub struct Simulation {
 }
 impl Simulation {
     const UPDATE_STEPS: usize = 8;
+    const USE_MULTITHREADING: bool = true;
 
     pub fn new() -> Self {
         let (color_picker_texture, _) = super::ui::color_picker_texture(100, 100);
@@ -221,16 +222,26 @@ impl Simulation {
             }
         }
 
-        rayon::scope(|s| {
-            if !self.paused {
-                s.spawn(|_| {
-                    for _ in 0..Simulation::UPDATE_STEPS {
-                        Simulation::update_state(&mut self.next_state, &self.previous_state, delta);
-                    }
-                });
+        if Simulation::USE_MULTITHREADING {
+            rayon::in_place_scope(|s| {
+                if !self.paused {
+                    s.spawn(|_| {
+                        for _ in 0..Simulation::UPDATE_STEPS {
+                            Simulation::update_state(&mut self.next_state, &self.previous_state, delta);
+                        }
+                    });
+                    Simulation::draw(&self.previous_state);
+                } else {
+                    Simulation::draw(&self.next_state);
+                }
+            });
+        } else {
+            for _ in 0..Simulation::UPDATE_STEPS {
+                Simulation::update_state(&mut self.next_state, &self.previous_state, delta);
             }
-        });
-        Simulation::draw(&self.next_state);
+            Simulation::draw(&self.next_state);
+        }
+
         self.handle_selection();
         if !self.paused {
             std::mem::swap(&mut self.next_state, &mut self.previous_state);
@@ -313,6 +324,7 @@ impl Simulation {
 
     /// Draws all points and links, coloring the selection differently
     fn draw(state: &SimulationState) {
+        debug!("draw");
         for i in 0..state.links.len() {
             let from = state.positions[state.links[i].from_idx];
             let to = state.positions[state.links[i].to_idx];
