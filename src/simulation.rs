@@ -33,7 +33,7 @@ impl SimulationState {
             fixed: vec![],
             links: vec![],
             force: Vec2::new(0.0, 200.0),
-            wall_damping: 0.0
+            wall_damping: 0.75
         }
     }
 }
@@ -141,6 +141,35 @@ impl Simulation {
     }
 
 
+    
+
+
+    // User input, that isnt selection
+    pub fn handle_interaction(&mut self) {
+        let mouse_pos = Vec2::from(mouse_position());
+        let prev_mouse_pos = mouse_pos - Vec2::from(mouse_delta_position()) * Vec2::from(screen_size());
+        let is_dragging = is_mouse_button_down(MouseButton::Right) && mouse_delta_position().length() > 0.0;
+
+        let mut new_links = if self.paused {
+            self.next_state.links.clone()
+        } else {
+            self.previous_state.links.clone()
+        };
+        new_links = new_links.into_iter().enumerate().filter_map(|(i, link)| {
+            let p0 = self.next_state.positions[self.next_state.links[i].from_idx];
+            let p1 = self.next_state.positions[self.next_state.links[i].to_idx];
+            let side_of_mouse_pos = side_of_line(mouse_pos, p0, p1);
+            let side_of_prev_mouse_pos = side_of_line(prev_mouse_pos, p0, p1);
+            if is_dragging && side_of_mouse_pos != side_of_prev_mouse_pos && ((mouse_pos.y >= p0.y && mouse_pos.y < p1.y) || (mouse_pos.x >= p0.x && mouse_pos.x < p1.x)) {
+                None
+            } else {
+                Some(link)
+            }
+        }).collect();
+        self.next_state.links = new_links;
+    }
+
+
     pub fn handle_selection(&mut self) {
         let mouse_pos = mouse_position();
         let mouse_pos = Vec2::new(mouse_pos.0, mouse_pos.1).clamp(Vec2::ZERO, Vec2::from(screen_size()));
@@ -198,7 +227,7 @@ impl Simulation {
                 }
             } else if target.0 == SelectTarget::Link {
                 ui::widgets::Window::new(hash!(), vec2(10.0, 10.0), vec2(200.0, 200.0))
-                    .label("Link editor")
+                    .label(&format!("Editing Link {}", target.1))
                     .movable(false)
                     .ui(&mut *ui::root_ui(), |ui| {
                         ui.slider(hash!(), "Min length", 0f32..1000f32, &mut self.next_state.links[target.1].min_length);
@@ -221,7 +250,7 @@ impl Simulation {
     pub fn update(&mut self, delta: f32) {
         if is_key_pressed(KeyCode::Space) {
             self.paused = !self.paused;
-            // Copy over the modified next_state
+            // Copy over the modified next_state if unpaused
             if !self.paused {
                 let _ = std::mem::replace(&mut self.previous_state, self.next_state.clone());
             }
@@ -248,6 +277,7 @@ impl Simulation {
         }
 
         self.handle_selection();
+        self.handle_interaction();
         if !self.paused {
             std::mem::swap(&mut self.next_state, &mut self.previous_state);
         }
@@ -367,4 +397,11 @@ fn distance_from_line(point: Vec2, line_start: Vec2, line_end: Vec2) -> f32 {
     let ba = line_end - line_start;
     let h = (pa.dot(ba)/ba.dot(ba)).clamp(0.0, 1.0);
     return (pa - ba*h).length();
+}
+
+
+// Returns 0 if the points is on the line, 1 if its left of the line, -1 if its right
+// Thanks to https://stackoverflow.com/a/1560510
+fn side_of_line(point: Vec2, line_start: Vec2, line_end: Vec2) -> i32 {
+    return (((line_end.x - line_start.x) * (point.y - line_start.y) - (line_end.y - line_start.y) * (point.x - line_start.x)) as i32).signum();
 }
