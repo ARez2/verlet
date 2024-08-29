@@ -148,6 +148,7 @@ impl Simulation {
     pub fn handle_interaction(&mut self) {
         let mouse_pos = Vec2::from(mouse_position());
         let prev_mouse_pos = mouse_pos - Vec2::from(mouse_delta_position()) * Vec2::from(screen_size());
+        let middle_mouse_pos = (mouse_pos + prev_mouse_pos) * 0.5;
         let is_dragging = is_mouse_button_down(MouseButton::Right) && mouse_delta_position().length() > 0.0;
 
         let mut new_links = if self.paused {
@@ -158,9 +159,12 @@ impl Simulation {
         new_links = new_links.into_iter().enumerate().filter_map(|(i, link)| {
             let p0 = self.next_state.positions[self.next_state.links[i].from_idx];
             let p1 = self.next_state.positions[self.next_state.links[i].to_idx];
+            
+            
             let side_of_mouse_pos = side_of_line(mouse_pos, p0, p1);
             let side_of_prev_mouse_pos = side_of_line(prev_mouse_pos, p0, p1);
-            if is_dragging && side_of_mouse_pos != side_of_prev_mouse_pos && ((mouse_pos.y >= p0.y && mouse_pos.y < p1.y) || (mouse_pos.x >= p0.x && mouse_pos.x < p1.x)) {
+            let length_of_link = p0.distance(p1);
+            if is_dragging && side_of_mouse_pos != side_of_prev_mouse_pos && middle_mouse_pos.distance((p1 + p0) * 0.5) < length_of_link * 0.5 {
                 None
             } else {
                 Some(link)
@@ -233,7 +237,14 @@ impl Simulation {
                         ui.slider(hash!(), "Min length", 0f32..1000f32, &mut self.next_state.links[target.1].min_length);
                         ui.slider(hash!(), "Max length", 0f32..1000f32, &mut self.next_state.links[target.1].max_length);
                         ui.input_text(hash!(), "Stiffness", &mut self.ui_text_stiffness);
-                        ui.slider(hash!(), "Damping", 0f32..1f32, &mut self.next_state.links[target.1].damping);
+                        
+                        
+                        
+                        // TODO: Maybe pass in "edit_state" into handle_selection and handle_interaction which is either next_state or previous_state depending on self.paused
+                        
+                        
+                        
+                        ui.slider(hash!(), "Damping", 0f32..1f32, &mut self.previous_state.links[target.1].damping);
                         self.next_state.links[target.1].min_length = self.next_state.links[target.1].min_length.min(self.next_state.links[target.1].max_length);
 
                         // Clean up input string a bit and parse it back to a float
