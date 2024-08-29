@@ -22,8 +22,6 @@ struct SimulationState {
 
     force: Vec2,
     wall_damping: f32,
-    selection: Option<(SelectTarget, usize)>,
-    dragging: bool,
 }
 impl SimulationState {
     pub fn new() -> Self {
@@ -35,9 +33,7 @@ impl SimulationState {
             fixed: vec![],
             links: vec![],
             force: Vec2::new(0.0, 200.0),
-            wall_damping: 0.9,
-            selection: None,
-            dragging: false,
+            wall_damping: 0.0
         }
     }
 }
@@ -81,6 +77,8 @@ enum SelectTarget {
     Point,
     Link
 }
+type Selection = Option<(SelectTarget, usize)>;
+
 
 #[derive(Debug)]
 pub struct Simulation {
@@ -88,6 +86,8 @@ pub struct Simulation {
     previous_state: SimulationState,
     // And write to next_state
     next_state: SimulationState,
+    selection: Selection,
+    dragging: bool,
     pub paused: bool,
 
     color_picker_texture: Texture2D,
@@ -96,12 +96,15 @@ pub struct Simulation {
 impl Simulation {
     const UPDATE_STEPS: usize = 8;
     const USE_MULTITHREADING: bool = true;
+    const MAX_VELOCITY: f32 = 5.0;
 
     pub fn new() -> Self {
         let (color_picker_texture, _) = super::ui::color_picker_texture(100, 100);
         Self {
             previous_state: SimulationState::new(),
             next_state: SimulationState::new(),
+            selection: None,
+            dragging: false,
             paused: false,
 
             color_picker_texture,
@@ -140,16 +143,17 @@ impl Simulation {
 
     pub fn handle_selection(&mut self) {
         let mouse_pos = mouse_position();
-        let mouse_pos = Vec2::new(mouse_pos.0, mouse_pos.1);
+        let mouse_pos = Vec2::new(mouse_pos.0, mouse_pos.1).clamp(Vec2::ZERO, Vec2::from(screen_size()));
+        let mouse_over_ui = ui::root_ui().is_mouse_over(mouse_pos);
 
-        if is_mouse_button_pressed(MouseButton::Left) && !ui::root_ui().is_mouse_over(mouse_pos) { // Find a point to select
-            self.next_state.selection = None;
+        if is_mouse_button_pressed(MouseButton::Left) && !mouse_over_ui { // Find a point to select
+            self.selection = None;
             let mut selection_distance = f32::MAX;
             for i in 0..self.next_state.positions.len() {
                 let pos = self.next_state.positions[i];
                 let dist = mouse_pos.distance(pos);
                 if dist < POINT_RADIUS {
-                    self.next_state.selection = Some((SelectTarget::Point, i));
+                    self.selection = Some((SelectTarget::Point, i));
                     selection_distance = dist - POINT_RADIUS;
                 }
             }
@@ -157,7 +161,7 @@ impl Simulation {
                 let link = &self.next_state.links[i];
                 let dist = distance_from_line(mouse_pos, self.next_state.positions[link.from_idx], self.next_state.positions[link.to_idx]);
                 if dist + POINT_RADIUS < POINT_RADIUS*SELECT_GRACE && dist < selection_distance {
-                    self.next_state.selection = Some((SelectTarget::Link, i));
+                    self.selection = Some((SelectTarget::Link, i));
                     self.ui_text_stiffness = self.next_state.links[i].stiffness.to_string();
                     selection_distance = dist;
                 }
@@ -165,7 +169,7 @@ impl Simulation {
         }
 
         
-        if let Some(target) = &self.next_state.selection {
+        if let Some(target) = &self.selection {
             if target.0 == SelectTarget::Point {
                 ui::widgets::Window::new(hash!(), vec2(10.0, 10.0), vec2(200.0, 200.0))
                     .label(&format!("Editing Point {}", target.1))
@@ -178,17 +182,18 @@ impl Simulation {
                             &mut self.next_state.colors[target.1],
                             self.color_picker_texture.clone(),
                         );
+                        ui.checkbox(hash!(), "Fixed", &mut self.next_state.fixed[target.1])
                 });
 
-                if !ui::root_ui().is_mouse_over(mouse_pos) {
-                    if is_mouse_button_pressed(MouseButton::Left) {
-                        self.next_state.dragging = true;
-                    } else if is_mouse_button_released(MouseButton::Left) {
-                        self.next_state.dragging = false;
-                    }
-                    if self.next_state.dragging && (mouse_delta_position() * Vec2::from(screen_size())).length() > 0.0 {
-                        self.next_state.positions[target.1] = Vec2::from(mouse_position());
-                        self.next_state.prev_positions[target.1] = Vec2::from(mouse_position());
+                if is_mouse_button_down(MouseButton::Left) && mouse_delta_position().length() > 0.0 {
+                    self.dragging = true;
+                } else if !is_mouse_button_down(MouseButton::Left) {
+                    self.dragging = false;
+                }
+                if !mouse_over_ui {
+                    if self.dragging {
+                        self.next_state.positions[target.1] = mouse_pos;
+                        self.next_state.prev_positions[target.1] = mouse_pos;
                     }
                 }
             } else if target.0 == SelectTarget::Link {
@@ -230,16 +235,16 @@ impl Simulation {
                             Simulation::update_state(&mut self.next_state, &self.previous_state, delta);
                         }
                     });
-                    Simulation::draw(&self.previous_state);
+                    Simulation::draw(&self.previous_state, &self.selection);
                 } else {
-                    Simulation::draw(&self.next_state);
+                    Simulation::draw(&self.next_state, &self.selection);
                 }
             });
         } else {
             for _ in 0..Simulation::UPDATE_STEPS {
                 Simulation::update_state(&mut self.next_state, &self.previous_state, delta);
             }
-            Simulation::draw(&self.next_state);
+            Simulation::draw(&self.next_state, &self.selection);
         }
 
         self.handle_selection();
@@ -261,7 +266,10 @@ impl Simulation {
                 continue
             };
 
-            let velocity = previous_state.positions[i] - previous_state.prev_positions[i];
+            let mut velocity = (previous_state.positions[i] - previous_state.prev_positions[i]);
+            if velocity.length() > f32::EPSILON {
+                velocity = velocity.clamp_length_max(Simulation::MAX_VELOCITY);
+            }
             let mut new_prev_pos = previous_state.positions[i];
             // Dont scale gravity by mass
             let accel = previous_state.force;
@@ -301,33 +309,35 @@ impl Simulation {
                 continue;
             }
             
-            let diff = if dist <= link.min_length {
+            let mut diff = if dist <= link.min_length {
                 link.min_length - dist
             } else {
                 link.max_length - dist
             };
-            let percent = (diff / dist) / 2.0;
-            let offset = pos_delta * percent;
-            let force = (offset).lerp(offset * link.stiffness, link.damping);
-            //force = offset;
+            diff /= dist;
+            let offset = pos_delta * diff * 0.5;
+            let offset = (offset).lerp(offset * link.stiffness, link.damping).clamp_length_max(100.0);
+            
+            let mass1 = p1_mass / (p0_mass + p1_mass);
+            let mass2 = p0_mass / (p0_mass + p1_mass);
 
             // Scale spring force by mass
             if !previous_state.fixed[link.from_idx] {
-                next_state.positions[link.from_idx] -= force / p0_mass;
+                next_state.positions[link.from_idx] -= offset * mass1;
             }
             if !previous_state.fixed[link.to_idx] {
-                next_state.positions[link.to_idx] += force / p1_mass;
+                next_state.positions[link.to_idx] += offset * mass2;
             }
         }
     }
 
 
     /// Draws all points and links, coloring the selection differently
-    fn draw(state: &SimulationState) {
+    fn draw(state: &SimulationState, selection: &Selection) {
         for i in 0..state.links.len() {
             let from = state.positions[state.links[i].from_idx];
             let to = state.positions[state.links[i].to_idx];
-            if let Some(selection) = &state.selection {
+            if let Some(selection) = selection {
                 if selection.0 == SelectTarget::Link && selection.1 == i {
                     draw_line(from.x, from.y, to.x, to.y, 2.0, SELECT_COLOR);
                     continue;
@@ -338,7 +348,7 @@ impl Simulation {
 
         for i in 0..state.positions.len() {
             let pos = state.positions[i];
-            if let Some(selection) = &state.selection {
+            if let Some(selection) = selection {
                 if selection.0 == SelectTarget::Point && selection.1 == i {
                     draw_circle_lines(pos.x, pos.y, POINT_RADIUS + 2.0, 4.0, SELECT_COLOR);
                 }

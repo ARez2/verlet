@@ -15,8 +15,8 @@ pub mod ui;
 fn window_conf() -> Conf {
     Conf {
         window_title: "Verlet".to_owned(),
-        window_width: 2560,
-        window_height: 1440,
+        window_width: 1920,
+        window_height: 1080,
         ..Default::default()
     }
 }
@@ -37,10 +37,12 @@ async fn main() {
         for x in 0..width {
             let from_idx = y * width + x;
             let mut pt = Point::new(spacing + Vec2::new(x as f32, y as f32) * spacing);
-            let stiff = 0.3;
-            let damp = 1.0;
+            let stiff = 0.1;
+            let damp = 0.0;
             if y == 0 {
                 pt = pt.fixed();
+            } else if y == height-1 {
+                pt = pt.mass(5.0);
             }
             if y < height-1 {
                 simulation.add_link(Link::new(from_idx, (y+1) * width + x).max_length(max_link_len).stiffness(stiff).damping(damp));
@@ -62,13 +64,13 @@ async fn main() {
         }
         if num_iterations > 0 {
             let font_size: u16 = 40;
-            let text = format!("Avg. update time: {} ns", time_sum.as_nanos() / num_iterations);
+            let text = format!("Avg. update time: {time:.*} ms", 3, time=(time_sum.as_millis() as f64 / num_iterations as f64));
             let dims = measure_text(&text, None, font_size, 1.0);
             draw_text(&text, screen_width()/2.0 - dims.width/2.0, dims.height, font_size as f32, GRAY);
         }
         
         let start = Instant::now();
-        simulation.update(1.0 / 60.0);
+        simulation.update(1.0 / 180.0);
         if !simulation.paused {
             time_sum += start.elapsed();
         }
