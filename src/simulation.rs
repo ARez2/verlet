@@ -214,12 +214,12 @@ impl Simulation {
                         ui.checkbox(hash!(), "Fixed", &mut self.next_state.fixed[target.1])
                 });
 
-                if is_mouse_button_down(MouseButton::Left) && mouse_delta_position().length() > 0.0 {
-                    self.dragging = true;
-                } else if !is_mouse_button_down(MouseButton::Left) {
-                    self.dragging = false;
-                }
                 if !mouse_over_ui {
+                    if is_mouse_button_down(MouseButton::Left) && mouse_delta_position().length() > 0.0 {
+                        self.dragging = true;
+                    } else if !is_mouse_button_down(MouseButton::Left) {
+                        self.dragging = false;
+                    }
                     if self.dragging {
                         self.next_state.positions[target.1] = mouse_pos;
                         self.next_state.prev_positions[target.1] = mouse_pos;
