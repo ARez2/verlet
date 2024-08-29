@@ -267,7 +267,7 @@ impl Simulation {
             }
         }
 
-        if Simulation::USE_MULTITHREADING {
+        if Simulation::USE_MULTITHREADING && !cfg!(target_arch="wasm32") {
             rayon::in_place_scope(|s| {
                 if !self.paused {
                     s.spawn(|_| {

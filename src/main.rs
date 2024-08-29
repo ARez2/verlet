@@ -24,6 +24,7 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    #[cfg(not(target_arch = "wasm32"))]
     std::env::set_var("RUST_BACKTRACE", "1");
 
     //rayon::ThreadPoolBuilder::new().num_threads(2).build_global().unwrap();
@@ -62,6 +63,7 @@ async fn main() {
         if !simulation.paused {
             num_iterations += 1;
         }
+        #[cfg(not(target_arch = "wasm32"))]
         if num_iterations > 0 {
             let font_size: u16 = 40;
             let text = format!("Avg. update time: {time:.*} ms", 3, time=(time_sum.as_millis() as f64 / num_iterations as f64));
@@ -69,8 +71,10 @@ async fn main() {
             draw_text(&text, screen_width()/2.0 - dims.width/2.0, dims.height, font_size as f32, GRAY);
         }
         
+        #[cfg(not(target_arch = "wasm32"))]
         let start = Instant::now();
         simulation.update(1.0 / 180.0);
+        #[cfg(not(target_arch = "wasm32"))]
         if !simulation.paused {
             time_sum += start.elapsed();
         }
