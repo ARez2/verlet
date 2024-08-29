@@ -96,7 +96,8 @@ pub struct Simulation {
 impl Simulation {
     const UPDATE_STEPS: usize = 8;
     const USE_MULTITHREADING: bool = true;
-    const MAX_VELOCITY: f32 = 5.0;
+    const MAX_VELOCITY: f32 = 15.0;
+    const MOTION_DAMPENING: f32 = 0.999;
 
     pub fn new() -> Self {
         let (color_picker_texture, _) = super::ui::color_picker_texture(100, 100);
@@ -159,7 +160,6 @@ impl Simulation {
         new_links = new_links.into_iter().enumerate().filter_map(|(i, link)| {
             let p0 = self.next_state.positions[self.next_state.links[i].from_idx];
             let p1 = self.next_state.positions[self.next_state.links[i].to_idx];
-            
             
             let side_of_mouse_pos = side_of_line(mouse_pos, p0, p1);
             let side_of_prev_mouse_pos = side_of_line(prev_mouse_pos, p0, p1);
@@ -307,9 +307,9 @@ impl Simulation {
                 continue
             };
 
-            let mut velocity = (previous_state.positions[i] - previous_state.prev_positions[i]);
+            let mut velocity = previous_state.positions[i] - previous_state.prev_positions[i];
             if velocity.length() > f32::EPSILON {
-                velocity = velocity.clamp_length_max(Simulation::MAX_VELOCITY);
+                velocity = velocity.clamp_length_max(Simulation::MAX_VELOCITY) * Simulation::MOTION_DAMPENING;
             }
             let mut new_prev_pos = previous_state.positions[i];
             // Dont scale gravity by mass
