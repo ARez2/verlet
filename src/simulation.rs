@@ -19,6 +19,7 @@ struct SimulationState {
     colors: Vec<Color>,
     fixed: Vec<bool>,
     links: Vec<Link>,
+    removed_link_indices: Vec<usize>,
 
     force: Vec2,
     wall_damping: f32,
@@ -32,6 +33,7 @@ impl SimulationState {
             colors: vec![],
             fixed: vec![],
             links: vec![],
+            removed_link_indices: vec![],
             force: Vec2::new(0.0, 200.0),
             wall_damping: 0.75
         }
@@ -157,9 +159,14 @@ impl Simulation {
         } else {
             self.previous_state.links.clone()
         };
+        let mut already_removed_links = 0;
         new_links = new_links.into_iter().enumerate().filter_map(|(i, link)| {
-            let p0 = self.next_state.positions[self.next_state.links[i].from_idx];
-            let p1 = self.next_state.positions[self.next_state.links[i].to_idx];
+            if self.next_state.removed_link_indices.binary_search(&i).is_ok() {
+                already_removed_links += 1;
+                return None;
+            }
+            let p0 = self.next_state.positions[self.next_state.links[i - already_removed_links].from_idx];
+            let p1 = self.next_state.positions[self.next_state.links[i - already_removed_links].to_idx];
             
             let side_of_mouse_pos = side_of_line(mouse_pos, p0, p1);
             let side_of_prev_mouse_pos = side_of_line(prev_mouse_pos, p0, p1);
@@ -289,6 +296,7 @@ impl Simulation {
 
         self.handle_selection();
         self.handle_interaction();
+        self.next_state.removed_link_indices.clear();
         if !self.paused {
             std::mem::swap(&mut self.next_state, &mut self.previous_state);
         }
@@ -336,18 +344,18 @@ impl Simulation {
 
 
     fn constrain(next_state: &mut SimulationState, previous_state: &SimulationState, delta: f32) {
-        for link_idx in 0..previous_state.links.len() {
-            let link = &previous_state.links[link_idx];
-
+        let mut link_idx: i32 = -1;
+        next_state.links.retain(|link| {
+            link_idx += 1;
             let p0 = previous_state.positions[link.from_idx];
             let p0_mass = previous_state.masses[link.from_idx];
             let p1 = previous_state.positions[link.to_idx];
             let p1_mass = previous_state.masses[link.to_idx];
             let pos_delta = p1 - p0;
             let dist = pos_delta.length().max(f32::EPSILON);
-
+    
             if dist > link.min_length && dist < link.max_length {
-                continue;
+                return true;
             }
             
             let mut diff = if dist <= link.min_length {
@@ -358,10 +366,15 @@ impl Simulation {
             diff /= dist;
             let offset = pos_delta * diff * 0.5;
             let offset = (offset).lerp(offset * link.stiffness, link.damping).clamp_length_max(100.0);
+    
+            if offset.length() > 3.0 {
+                next_state.removed_link_indices.push(link_idx as usize);
+                return false;
+            }
             
             let mass1 = p1_mass / (p0_mass + p1_mass);
             let mass2 = p0_mass / (p0_mass + p1_mass);
-
+    
             // Scale spring force by mass
             if !previous_state.fixed[link.from_idx] {
                 next_state.positions[link.from_idx] -= offset * mass1;
@@ -369,7 +382,8 @@ impl Simulation {
             if !previous_state.fixed[link.to_idx] {
                 next_state.positions[link.to_idx] += offset * mass2;
             }
-        }
+            true
+        });
     }
 
 
