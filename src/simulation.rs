@@ -91,6 +91,7 @@ pub struct Simulation {
     selection: Selection,
     dragging: bool,
     pub paused: bool,
+    frame: i32,
 
     color_picker_texture: Texture2D,
     ui_text_stiffness: String,
@@ -109,6 +110,7 @@ impl Simulation {
             selection: None,
             dragging: false,
             paused: false,
+            frame: 0,
 
             color_picker_texture,
             ui_text_stiffness: String::new()
@@ -142,9 +144,6 @@ impl Simulation {
         self.next_state.links.push(link.clone());
         self.previous_state.links.push(link);
     }
-
-
-    
 
 
     // User input, that isnt selection
@@ -266,6 +265,7 @@ impl Simulation {
 
 
     pub fn update(&mut self, delta: f32) {
+        self.frame += 1;
         if is_key_pressed(KeyCode::Space) {
             self.paused = !self.paused;
             // Copy over the modified next_state if unpaused
@@ -277,19 +277,24 @@ impl Simulation {
         if Simulation::USE_MULTITHREADING && !cfg!(target_arch="wasm32") {
             rayon::in_place_scope(|s| {
                 if !self.paused {
+                    let prev_draw = self.previous_state.clone();
                     s.spawn(|_| {
                         for _ in 0..Simulation::UPDATE_STEPS {
                             Simulation::update_state(&mut self.next_state, &self.previous_state, delta);
+                            std::mem::swap(&mut self.next_state, &mut self.previous_state);
                         }
                     });
-                    Simulation::draw(&self.previous_state, &self.selection);
+                    Simulation::draw(&prev_draw, &self.selection);
                 } else {
                     Simulation::draw(&self.next_state, &self.selection);
                 }
             });
         } else {
-            for _ in 0..Simulation::UPDATE_STEPS {
-                Simulation::update_state(&mut self.next_state, &self.previous_state, delta);
+            if !self.paused {
+                for _ in 0..Simulation::UPDATE_STEPS {
+                    Simulation::update_state(&mut self.next_state, &self.previous_state, delta);
+                    std::mem::swap(&mut self.next_state, &mut self.previous_state);
+                }
             }
             Simulation::draw(&self.next_state, &self.selection);
         }
@@ -307,14 +312,13 @@ impl Simulation {
         if delta > 1.0 {
             return;
         }
-
         // Somehow macroquad doesnt want to be called inside of a rayon iterator, so call it outside
         let screen_size = screen_size();
-        for i in 0..previous_state.positions.len() {
+        for i in 0..next_state.positions.len() {
             if previous_state.fixed[i] {
-                continue
+                continue;
             };
-
+    
             let mut velocity = previous_state.positions[i] - previous_state.prev_positions[i];
             if velocity.length() > f32::EPSILON {
                 velocity = velocity.clamp_length_max(Simulation::MAX_VELOCITY) * Simulation::MOTION_DAMPENING;
@@ -334,10 +338,10 @@ impl Simulation {
                 new_pos.y = new_pos.y.clamp(0.0, screen_size.1);
                 new_prev_pos.y = new_pos.y + velocity.y * previous_state.wall_damping;
             }
-
+    
             next_state.positions[i] = new_pos;
             next_state.prev_positions[i] = new_prev_pos;
-        }
+        };
 
         Simulation::constrain(next_state, previous_state, delta);
     }
@@ -405,10 +409,11 @@ impl Simulation {
             let pos = state.positions[i];
             if let Some(selection) = selection {
                 if selection.0 == SelectTarget::Point && selection.1 == i {
-                    draw_circle_lines(pos.x, pos.y, POINT_RADIUS + 2.0, 4.0, SELECT_COLOR);
+                    draw_poly_lines(pos.x, pos.y, 10, POINT_RADIUS + 2.0, 0., 4.0, SELECT_COLOR);
                 }
             }
-            draw_circle(pos.x, pos.y, POINT_RADIUS, state.colors[i]);
+            //draw_circle(pos.x, pos.y, POINT_RADIUS, state.colors[i]);
+            draw_poly(pos.x, pos.y, 7, POINT_RADIUS, 0., state.colors[i]);
         }
     }
 }
