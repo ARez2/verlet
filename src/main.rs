@@ -3,10 +3,8 @@ use std::time::{Duration, Instant};
 use macroquad::prelude::*;
 
 mod simulation;
-mod link;
-pub use link::Link;
 use miniquad::window::screen_size;
-use simulation::{Point, Simulation};
+use simulation::{Simulation, Point, Link};
 
 pub mod ui;
 

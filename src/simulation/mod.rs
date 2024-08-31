@@ -2,7 +2,12 @@ use macroquad::{prelude::*, ui::{self, hash}};
 use miniquad::window::screen_size;
 use rayon::prelude::*;
 
-use super::{ui::colorbox, Link};
+mod link;
+pub use link::Link;
+mod point;
+pub use point::Point;
+
+use super::ui::colorbox;
 
 
 const POINT_RADIUS: f32 = 7.0;
@@ -40,38 +45,6 @@ impl SimulationState {
     }
 }
 
-
-// Only used for defining points, not in the Simulation itself
-#[derive(Debug)]
-pub struct Point {
-    position: Vec2,
-    fixed: bool,
-    mass: f32,
-    color: Color
-}
-impl Point {
-    pub fn new(position: Vec2) -> Self {
-        Self {
-            position,
-            mass: 1.0,
-            fixed: false,
-            color: WHITE
-        }
-    }
-
-    pub fn mass(mut self, val: f32) -> Self {
-        self.mass = val;
-        self
-    }
-    pub fn fixed(mut self) -> Self {
-        self.fixed = true;
-        self
-    }
-    pub fn color(mut self, val: Color) -> Self {
-        self.color = val;
-        self
-    }
-}
 
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
