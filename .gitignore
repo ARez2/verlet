@@ -3,3 +3,6 @@
 # Exclude flamegraph data
 **/perf.data**
 **/flamegraph.svg
+
+# Exclude VSCode folder
+.vscode/

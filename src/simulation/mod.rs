@@ -1,11 +1,12 @@
 use macroquad::{prelude::*, ui::{self, hash}};
 use miniquad::window::screen_size;
-use rayon::prelude::*;
 
 mod link;
 pub use link::Link;
 mod point;
 pub use point::Point;
+mod ik;
+pub use ik::IKChain;
 
 use super::ui::colorbox;
 
@@ -25,6 +26,8 @@ struct SimulationState {
     fixed: Vec<bool>,
     links: Vec<Link>,
     removed_link_indices: Vec<usize>,
+    // A list of all the IK chains, represented as list of SimulationState::links indices
+    ik_chains: Vec<IKChain>,
 
     force: Vec2,
     wall_damping: f32,
@@ -39,6 +42,7 @@ impl SimulationState {
             fixed: vec![],
             links: vec![],
             removed_link_indices: vec![],
+            ik_chains: vec![],
             force: Vec2::new(0.0, 200.0),
             wall_damping: 0.75
         }
@@ -70,7 +74,7 @@ pub struct Simulation {
     ui_text_stiffness: String,
 }
 impl Simulation {
-    const UPDATE_STEPS: usize = 8;
+    const UPDATE_STEPS: usize = 4;
     const USE_MULTITHREADING: bool = true;
     const MAX_VELOCITY: f32 = 15.0;
     const MOTION_DAMPENING: f32 = 0.999;
@@ -103,7 +107,7 @@ impl Simulation {
             self.next_state.masses.push(point.mass);
             self.next_state.colors.push(point.color);
             self.next_state.fixed.push(point.fixed);
-            
+
             self.previous_state.positions.push(point.position);
             self.previous_state.prev_positions.push(point.position);
             self.previous_state.masses.push(point.mass);
@@ -115,7 +119,17 @@ impl Simulation {
 
     pub fn add_link(&mut self, link: Link) {
         self.next_state.links.push(link.clone());
-        self.previous_state.links.push(link);
+        self.previous_state.links.push(link.clone());
+    }
+
+
+    pub fn add_ik_chain(&mut self, mut ik_chain: IKChain) {
+        ik_chain.current_max_length = ik_chain.links.iter().map(|link| {
+            let link = &self.previous_state.links[*link];
+            link.max_length
+        }).sum::<f32>();
+        self.next_state.ik_chains.push(ik_chain.clone());
+        self.previous_state.ik_chains.push(ik_chain);
     }
 
 
@@ -150,6 +164,8 @@ impl Simulation {
             }
         }).collect();
         self.next_state.links = new_links;
+
+        self.next_state.ik_chains[0].target_position = mouse_pos;
     }
 
 
@@ -285,6 +301,7 @@ impl Simulation {
         if delta > 1.0 {
             return;
         }
+
         // Somehow macroquad doesnt want to be called inside of a rayon iterator, so call it outside
         let screen_size = screen_size();
         for i in 0..next_state.positions.len() {
@@ -316,13 +333,14 @@ impl Simulation {
             next_state.prev_positions[i] = new_prev_pos;
         };
 
+        ik::solve_FABRIK(next_state, previous_state);
         Simulation::constrain(next_state, previous_state, delta);
     }
 
 
     fn constrain(next_state: &mut SimulationState, previous_state: &SimulationState, delta: f32) {
         let mut link_idx: i32 = -1;
-        next_state.links.retain(|link| {
+        next_state.links.retain_mut(|link| {
             link_idx += 1;
             let p0 = previous_state.positions[link.from_idx];
             let p0_mass = previous_state.masses[link.from_idx];
@@ -343,11 +361,12 @@ impl Simulation {
             diff /= dist;
             let offset = pos_delta * diff * 0.5;
             let offset = (offset).lerp(offset * link.stiffness, link.damping).clamp_length_max(100.0);
-    
-            if offset.length() > 3.0 {
-                next_state.removed_link_indices.push(link_idx as usize);
-                return false;
-            }
+            
+            // FIXME: Make tearing-stress a constant and enable it
+            // if offset.length() > 3.0 {
+            //     next_state.removed_link_indices.push(link_idx as usize);
+            //     return false;
+            // }
             
             let mass1 = p1_mass / (p0_mass + p1_mass);
             let mass2 = p0_mass / (p0_mass + p1_mass);
@@ -362,6 +381,9 @@ impl Simulation {
             true
         });
     }
+
+
+    
 
 
     /// Draws all points and links, coloring the selection differently
