@@ -1,4 +1,4 @@
-use macroquad::math::Vec2;
+use macroquad::{math::Vec2, prelude::debug};
 
 use super::SimulationState;
 
@@ -41,24 +41,35 @@ const FABRIK_EXTRA_ERROR_MARGIN: f32 = 10.0;
 pub fn solve_FABRIK(next_state: &mut SimulationState, previous_state: &SimulationState) {
     for chain_idx in 0..previous_state.ik_chains.len() {
         let chain = &previous_state.ik_chains[chain_idx];
-        if chain.links.is_empty() {
+        // "Cut" the chain, when a link has been removed this frame
+        // Use this instead of chain.links so we can react if a link has just been destroyed
+        let chain_links = &previous_state.ik_chains[chain_idx].links.iter().map_while(|link_idx| {
+            if !next_state.removed_link_indices.contains(link_idx) {
+                Some(*link_idx)
+            } else {
+                None
+            }
+        }).collect::<Vec<usize>>();
+        next_state.ik_chains[chain_idx].links = chain_links.clone();
+        if chain_links.is_empty() {
             continue;
         }
-        let start_pos = previous_state.positions[chain.links[0]];
+
+        let start_pos = previous_state.positions[chain_links[0]];
         let target_pos = chain.target_position;
         
         let diff = target_pos - start_pos;
         let dir_to_target = diff.normalize_or_zero();
 
         // Recalculate the max length in case it has changed (for example by user input)
-        let chain_max_length = chain.links.iter().map(|link| {
+        let chain_max_length = chain_links.iter().map(|link| {
             let link = &previous_state.links[*link];
             link.max_length
         }).sum::<f32>();
         // If we cant even reach the target, point each link straight towards the target and be done
         if chain_max_length < diff.length() - chain.error_margin - FABRIK_EXTRA_ERROR_MARGIN {
             let mut prev_pos = start_pos;
-            for link_idx in chain.links.iter() {
+            for link_idx in chain_links.iter() {
                 let link = &next_state.links[*link_idx];
                 let next_pos = prev_pos + dir_to_target * link.max_length;
                 next_state.positions[link.to_idx] = next_pos;
@@ -71,7 +82,7 @@ pub fn solve_FABRIK(next_state: &mut SimulationState, previous_state: &Simulatio
         let mut point_positions = vec![];
         let mut point_indices = vec![];
         let mut link_lengths = vec![];
-        for link_idx in &chain.links {
+        for link_idx in chain_links {
             let link = &previous_state.links[*link_idx];
             if !point_indices.contains(&link.from_idx) {
                 point_indices.push(link.from_idx);

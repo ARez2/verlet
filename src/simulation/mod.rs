@@ -78,6 +78,7 @@ impl Simulation {
     const USE_MULTITHREADING: bool = true;
     const MAX_VELOCITY: f32 = 15.0;
     const MOTION_DAMPENING: f32 = 0.999;
+    const MAX_LINK_STRESS: f32 = 3.0;
 
     pub fn new() -> Self {
         let (color_picker_texture, _) = super::ui::color_picker_texture(100, 100);
@@ -158,6 +159,7 @@ impl Simulation {
             let side_of_prev_mouse_pos = side_of_line(prev_mouse_pos, p0, p1);
             let length_of_link = p0.distance(p1);
             if is_dragging && side_of_mouse_pos != side_of_prev_mouse_pos && middle_mouse_pos.distance((p1 + p0) * 0.5) < length_of_link * 0.5 {
+                self.next_state.removed_link_indices.push(i);
                 None
             } else {
                 Some(link)
@@ -165,7 +167,9 @@ impl Simulation {
         }).collect();
         self.next_state.links = new_links;
 
-        self.next_state.ik_chains[0].target_position = mouse_pos;
+        if !self.next_state.ik_chains.is_empty() {
+            self.next_state.ik_chains[0].target_position = mouse_pos;
+        }
     }
 
 
@@ -263,6 +267,9 @@ impl Simulation {
             }
         }
 
+        self.handle_selection();
+        self.handle_interaction();
+
         if Simulation::USE_MULTITHREADING && !cfg!(target_arch="wasm32") {
             rayon::in_place_scope(|s| {
                 if !self.paused {
@@ -288,8 +295,7 @@ impl Simulation {
             Simulation::draw(&self.next_state, &self.selection);
         }
 
-        self.handle_selection();
-        self.handle_interaction();
+        
         self.next_state.removed_link_indices.clear();
         if !self.paused {
             std::mem::swap(&mut self.next_state, &mut self.previous_state);
@@ -362,11 +368,10 @@ impl Simulation {
             let offset = pos_delta * diff * 0.5;
             let offset = (offset).lerp(offset * link.stiffness, link.damping).clamp_length_max(100.0);
             
-            // FIXME: Make tearing-stress a constant and enable it
-            // if offset.length() > 3.0 {
-            //     next_state.removed_link_indices.push(link_idx as usize);
-            //     return false;
-            // }
+            if offset.length() > Simulation::MAX_LINK_STRESS {
+                next_state.removed_link_indices.push(link_idx as usize);
+                return false;
+            }
             
             let mass1 = p1_mass / (p0_mass + p1_mass);
             let mass2 = p0_mass / (p0_mass + p1_mass);
