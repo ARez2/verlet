@@ -3,7 +3,6 @@ use std::time::{Duration, Instant};
 use macroquad::prelude::*;
 
 mod simulation;
-use miniquad::window::screen_size;
 use simulation::{IKChain, Link, Point, Simulation};
 
 pub mod ui;

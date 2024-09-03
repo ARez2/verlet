@@ -1,6 +1,7 @@
-use macroquad::{math::Vec2, prelude::debug};
+use macroquad::math::Vec2;
 
 use super::SimulationState;
+
 
 #[derive(Debug, Clone)]
 pub struct IKChain {
@@ -13,6 +14,7 @@ pub struct IKChain {
     // Gets recalculated each frame by the sum of length of all links
     pub(super) current_max_length: f32,
 }
+#[allow(dead_code)]
 impl IKChain {
     pub fn new(links: Vec<usize>) -> Self {
         Self {
@@ -46,6 +48,7 @@ impl IKChain {
 // Without this extra error margin, the chain would sometimes "snap" to the straightened state
 // when the target is "just" out of reach.
 const FABRIK_EXTRA_ERROR_MARGIN: f32 = 50.0;
+#[allow(non_snake_case)]
 pub fn solve_FABRIK(next_state: &mut SimulationState, previous_state: &SimulationState) {
     for chain_idx in 0..previous_state.ik_chains.len() {
         let chain = &previous_state.ik_chains[chain_idx];
@@ -58,7 +61,7 @@ pub fn solve_FABRIK(next_state: &mut SimulationState, previous_state: &Simulatio
                 None
             }
         }).collect::<Vec<usize>>();
-        next_state.ik_chains[chain_idx].links = chain_links.clone();
+        next_state.ik_chains[chain_idx].links.clone_from(chain_links);
         if chain_links.is_empty() {
             continue;
         }
@@ -104,10 +107,10 @@ pub fn solve_FABRIK(next_state: &mut SimulationState, previous_state: &Simulatio
         }
         let num_points = point_indices.len();
 
-        for n in 0..chain.num_iterations {
+        for _ in 0..chain.num_iterations {
             // Forward reaching
             point_positions[num_points - 1] = target_pos;
-            (0..=num_points-2).into_iter().rev().for_each(|pt_idx| {
+            (0..=num_points-2).rev().for_each(|pt_idx| {
                 let p0 = point_positions[pt_idx];
                 let p1 = point_positions[pt_idx + 1];
                 let pt_delta = p1 - p0;
@@ -118,7 +121,7 @@ pub fn solve_FABRIK(next_state: &mut SimulationState, previous_state: &Simulatio
 
             // Backward reaching
             point_positions[0] = start_pos;
-            (0..=num_points-2).into_iter().for_each(|pt_idx| {
+            (0..=num_points-2).for_each(|pt_idx| {
                 let p0 = point_positions[pt_idx];
                 let p1 = point_positions[pt_idx + 1];
                 let pt_delta = p1 - p0;

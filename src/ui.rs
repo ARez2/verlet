@@ -30,12 +30,12 @@ fn color_picker(ui: &mut Ui, id: Id, data: &mut Color, color_picker_texture: Tex
     let y = mouse.1 as i32 - (cursor.y as i32 + 20);
 
     if x > 0 && x < 200 && y > 0 && y < 200 {
-        let ratio = 1.0 / 200.0 as f32;
+        let ratio = 1.0 / 200.0;
         let lightness = 1.0 - x as f32 * ratio;
         let hue = y as f32 * ratio;
 
-        if is_mouse_button_down(MouseButton::Left) && is_mouse_captured == false {
-            *data = macroquad::color::hsl_to_rgb(hue, 1.0, lightness).into();
+        if is_mouse_button_down(MouseButton::Left) && !is_mouse_captured {
+            *data = macroquad::color::hsl_to_rgb(hue, 1.0, lightness);
         }
     }
 
@@ -88,9 +88,9 @@ fn color_picker(ui: &mut Ui, id: Id, data: &mut Color, color_picker_texture: Tex
         || is_key_down(KeyCode::Escape)
         || is_key_down(KeyCode::Enter)
         || (is_mouse_button_pressed(MouseButton::Left)
-            && Rect::new(cursor.x - 10., cursor.y - 10.0, 230., 420.)
+            && !Rect::new(cursor.x - 10., cursor.y - 10.0, 230., 420.)
                 .contains(vec2(mouse.0, mouse.1))
-                == false)
+            )
     {
         return true;
     }

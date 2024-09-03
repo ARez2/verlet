@@ -8,6 +8,7 @@ pub struct Point {
     pub(super) mass: f32,
     pub(super) color: Color
 }
+#[allow(dead_code)]
 impl Point {
     pub fn new(position: Vec2) -> Self {
         Self {

@@ -137,7 +137,7 @@ impl Simulation {
     // User input, that isnt selection
     pub fn handle_interaction(&mut self) {
         let mouse_pos = Vec2::from(mouse_position());
-        let prev_mouse_pos = mouse_pos - Vec2::from(mouse_delta_position()) * Vec2::from(screen_size());
+        let prev_mouse_pos = mouse_pos - mouse_delta_position() * Vec2::from(screen_size());
         let middle_mouse_pos = (mouse_pos + prev_mouse_pos) * 0.5;
         let is_dragging = is_mouse_button_down(MouseButton::Right) && mouse_delta_position().length() > 0.0;
 
@@ -206,7 +206,7 @@ impl Simulation {
                 ui::widgets::Window::new(hash!(), vec2(10.0, 10.0), vec2(200.0, 200.0))
                     .label(&format!("Editing Point {}", target.1))
                     .movable(false)
-                    .ui(&mut *ui::root_ui(), |ui| {
+                    .ui(&mut ui::root_ui(), |ui| {
                         colorbox(
                             ui,
                             hash!(),
@@ -232,7 +232,7 @@ impl Simulation {
                 ui::widgets::Window::new(hash!(), vec2(10.0, 10.0), vec2(200.0, 200.0))
                     .label(&format!("Editing Link {}", target.1))
                     .movable(false)
-                    .ui(&mut *ui::root_ui(), |ui| {
+                    .ui(&mut ui::root_ui(), |ui| {
                         ui.slider(hash!(), "Min length", 0f32..1000f32, &mut self.next_state.links[target.1].min_length);
                         ui.slider(hash!(), "Max length", 0f32..1000f32, &mut self.next_state.links[target.1].max_length);
                         ui.input_text(hash!(), "Stiffness", &mut self.ui_text_stiffness);
@@ -340,11 +340,11 @@ impl Simulation {
         };
 
         ik::solve_FABRIK(next_state, previous_state);
-        Simulation::constrain(next_state, previous_state, delta);
+        Simulation::constrain(next_state, previous_state);
     }
 
 
-    fn constrain(next_state: &mut SimulationState, previous_state: &SimulationState, delta: f32) {
+    fn constrain(next_state: &mut SimulationState, previous_state: &SimulationState) {
         let mut link_idx: i32 = -1;
         next_state.links.retain_mut(|link| {
             link_idx += 1;
@@ -426,12 +426,12 @@ fn distance_from_line(point: Vec2, line_start: Vec2, line_end: Vec2) -> f32 {
     let pa = point - line_start;
     let ba = line_end - line_start;
     let h = (pa.dot(ba)/ba.dot(ba)).clamp(0.0, 1.0);
-    return (pa - ba*h).length();
+    (pa - ba*h).length()
 }
 
 
 // Returns 0 if the points is on the line, 1 if its left of the line, -1 if its right
 // Thanks to https://stackoverflow.com/a/1560510
 fn side_of_line(point: Vec2, line_start: Vec2, line_end: Vec2) -> i32 {
-    return (((line_end.x - line_start.x) * (point.y - line_start.y) - (line_end.y - line_start.y) * (point.x - line_start.x)) as i32).signum();
+    (((line_end.x - line_start.x) * (point.y - line_start.y) - (line_end.y - line_start.y) * (point.x - line_start.x)) as i32).signum()
 }

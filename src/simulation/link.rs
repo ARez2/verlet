@@ -8,6 +8,7 @@ pub struct Link {
     pub(crate) stiffness: f32,
     pub(crate) damping: f32,
 }
+#[allow(dead_code)]
 impl Link {
     pub fn new(from_idx: usize, to_idx: usize) -> Self {
         Self {
