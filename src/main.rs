@@ -55,7 +55,7 @@ async fn main() {
 
     let chain_start_pos = Vec2::new(100.0, 500.0);
     let chain_end_pos = Vec2::new(1800.0, 500.0);
-    let num_links = 50;
+    let num_links = 20;
     let diff = (chain_end_pos - chain_start_pos) / num_links as f32;
     let link_length = diff.length();
     simulation.add_point(Point::new(chain_start_pos).fixed());
