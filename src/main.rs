@@ -76,6 +76,7 @@ enum TextPlacement {
     Centered,
     CenteredHorizontally,
     TopLeftCorner,
+    TopRightCorner,
     AtPosition,
 }
 
@@ -84,6 +85,7 @@ fn place_text(text: &str, x: f32, y: f32, placement: TextPlacement, color: Color
     let position = match placement {
         TextPlacement::CenteredHorizontally => (x - dims.width / 2.0, y + dims.height),
         TextPlacement::TopLeftCorner => (x, y + dims.height),
+        TextPlacement::TopRightCorner => (x - dims.width, y + dims.height),
         TextPlacement::Centered => (x - dims.width / 2.0, y + dims.height / 2.0),
         TextPlacement::AtPosition => (x, y),
     };
@@ -99,7 +101,6 @@ async fn main() {
 
     let mut simulation = Simulation::new();
     setup_cloth(&mut simulation);
-    // setup_IK(&mut simulation);
 
     let mut time_sum = Duration::ZERO;
     let mut num_iterations = 0;
@@ -140,6 +141,25 @@ async fn main() {
         #[cfg(not(target_arch = "wasm32"))]
         if !simulation.paused {
             time_sum += start.elapsed();
+        }
+
+        place_text(
+            "Press 1 for cloth, 2 for IK",
+            screen_width() - 40.0,
+            0.0,
+            TextPlacement::TopRightCorner,
+            GRAY,
+            40,
+        );
+        if is_key_released(KeyCode::Key1) || is_key_released(KeyCode::Key2) {
+            simulation = Simulation::new();
+            time_sum = Duration::ZERO;
+            num_iterations = 0;
+            if is_key_released(KeyCode::Key1) {
+                setup_cloth(&mut simulation);
+            } else if is_key_released(KeyCode::Key2) {
+                setup_IK(&mut simulation);
+            }
         }
 
         next_frame().await
